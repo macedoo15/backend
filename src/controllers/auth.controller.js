@@ -1,21 +1,12 @@
 // ============================================================
-//  controllers/auth.controller.js
-//  Controla login, logout e sessão
+//  controllers/authController.js
 // ============================================================
 
 const { login, logout, obterSessao } = require('../services/auth.service');
 const { ok, erro, naoAutorizado }    = require('../utils/response');
-const { ADMIN_EMAILS }               = require('../config/env');
 const { extrairToken }               = require('../middlewares/auth');
 
-function ehAdmin(user) {
-  const email = String(user?.email || '').toLowerCase();
-  const role  = user?.app_metadata?.role || user?.user_metadata?.role;
-  if (ADMIN_EMAILS.length) return ADMIN_EMAILS.includes(email);
-  return role === 'admin';
-}
-
-// POST /api/auth/login
+// POST /api/login
 async function fazerLogin(req, res, next) {
   const { email, senha } = req.body || {};
 
@@ -24,14 +15,11 @@ async function fazerLogin(req, res, next) {
   }
 
   try {
+    // Autentica no Supabase — se falhar, lança erro 401
     const sessao = await login(email, senha);
 
-    // Verifica se é admin antes de autorizar acesso ao painel
+    // Busca dados do usuário para retornar o email
     const user = await obterSessao(sessao.access_token);
-    if (!ehAdmin(user)) {
-      await logout(sessao.access_token);
-      return naoAutorizado(res, 'Acesso restrito a administradores.');
-    }
 
     return ok(res, {
       access_token:  sessao.access_token,
@@ -42,12 +30,12 @@ async function fazerLogin(req, res, next) {
     });
 
   } catch (err) {
-    if (err.statusCode === 401) return naoAutorizado(res, err.message);
+    if (err.statusCode === 401) return naoAutorizado(res, 'E-mail ou senha incorretos.');
     next(err);
   }
 }
 
-// POST /api/auth/logout
+// POST /api/logout
 async function fazerLogout(req, res, next) {
   const token = extrairToken(req);
   try {
@@ -58,14 +46,11 @@ async function fazerLogout(req, res, next) {
   }
 }
 
-// GET /api/auth/session
+// GET /api/session
 async function verificarSessao(req, res, next) {
   try {
-    const user = req.user; // já validado pelo middleware requerAdmin
-    return ok(res, {
-      email: user.email,
-      id:    user.id,
-    });
+    const user = req.user; // populado pelo requireAuth
+    return ok(res, { email: user.email, id: user.id });
   } catch (err) {
     next(err);
   }
