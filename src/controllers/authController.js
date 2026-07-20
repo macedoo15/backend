@@ -3,8 +3,8 @@
 // ============================================================
 
 const { login, logout, obterSessao } = require('../services/auth.service');
-const { ok, erro, naoAutorizado }    = require('../utils/response');
-const { extrairToken }               = require('../middlewares/auth');
+const { ok, erro }                   = require('../utils/response');
+const { isAdmin }                    = require('../config/adminEmails');
 
 // POST /api/login
 async function fazerLogin(req, res, next) {
@@ -15,11 +15,16 @@ async function fazerLogin(req, res, next) {
   }
 
   try {
-    // Autentica no Supabase — se falhar, lança erro 401
+    // 1. Autentica no Supabase
     const sessao = await login(email, senha);
 
-    // Busca dados do usuário para retornar o email
+    // 2. Busca dados do usuário para verificar se é admin
     const user = await obterSessao(sessao.access_token);
+
+    // 3. Verifica se é administrador
+    if (!isAdmin(user)) {
+      return erro(res, 'Acesso negado. Usuário não é administrador.', 403);
+    }
 
     return ok(res, {
       access_token:  sessao.access_token,
@@ -30,14 +35,14 @@ async function fazerLogin(req, res, next) {
     });
 
   } catch (err) {
-    if (err.statusCode === 401) return naoAutorizado(res, 'E-mail ou senha incorretos.');
+    if (err.statusCode === 401) return erro(res, 'E-mail ou senha incorretos.', 401);
     next(err);
   }
 }
 
 // POST /api/logout
 async function fazerLogout(req, res, next) {
-  const token = extrairToken(req);
+  const token = req.token; // populado pelo requireAuth
   try {
     if (token) await logout(token);
     return ok(res, { mensagem: 'Logout realizado com sucesso.' });

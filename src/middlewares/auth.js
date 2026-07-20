@@ -5,9 +5,13 @@ const { verificarToken } = require('../config/supabase');
 const { isAdmin }        = require('../config/adminEmails');
 const { erro }           = require('../utils/response');
 
-async function requireAuth(req, res, next) {
+function extrairToken(req) {
   const header = req.headers.authorization || '';
-  const token  = header.replace(/^Bearer\s+/i, '').trim();
+  return header.replace(/^Bearer\s+/i, '').trim();
+}
+
+async function requireAuth(req, res, next) {
+  const token = extrairToken(req);
 
   if (!token) return erro(res, 'Token não informado.', 401);
 
@@ -29,4 +33,4 @@ async function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin };
+module.exports = { requireAuth, requireAdmin, extrairToken };
