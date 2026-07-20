@@ -11,18 +11,23 @@ const authRoute      = require('./routes/auth');
 
 const app = express();
 
-// ── CORS — aceita qualquer origem no Vercel ──
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',').map(o => o.trim()).filter(Boolean);
+// ── CORS — lista fixa + variável de ambiente ──
+const ORIGENS_FIXAS = [
+  'https://cadastro-qr.vercel.app',
+];
+
+const allowedOrigins = [
+  ...ORIGENS_FIXAS,
+  ...(process.env.ALLOWED_ORIGINS || '')
+    .split(',').map(o => o.trim()).filter(Boolean),
+];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Sem origin = requisição server-side ou curl — permite
+    // Sem origin = curl / server-side — permite
     if (!origin) return callback(null, true);
-    // Se não tem lista definida, permite tudo (dev/Railway)
-    if (!allowedOrigins.length) return callback(null, true);
-    // Verifica se a origin está na lista
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`CORS bloqueado para origin: ${origin}`);
     callback(new Error(`CORS bloqueado para origin: ${origin}`));
   },
   credentials: true,
